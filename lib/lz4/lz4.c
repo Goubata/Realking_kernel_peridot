@@ -401,6 +401,14 @@ static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
       * on certain mobile chipsets, performance is reduced with clang. For
       * more information refer to https://github.com/lz4/lz4/pull/707 */
 #    define LZ4_FAST_DEC_LOOP 1
+#  elif defined(__aarch64__) && defined(LZ4_FORCE_AARCH64_CLANG_FAST_LOOP)
+     /* Upstream disables the fast decode loop for clang on non-Apple aarch64
+      * because of a regression seen on *some* older mobile SoCs (PR #707).
+      * Modern high-end aarch64 cores (e.g. Cortex-X/Oryon on 8-series
+      * Snapdragons) were not part of that regression report. Define
+      * LZ4_FORCE_AARCH64_CLANG_FAST_LOOP at build time to re-enable this
+      * path and benchmark on your actual target before shipping it. */
+#    define LZ4_FAST_DEC_LOOP 1
 #  else
 #    define LZ4_FAST_DEC_LOOP 0
 #  endif
@@ -2038,6 +2046,16 @@ LZ4_decompress_generic(
             DEBUGLOG(6, "blockPos%6u: offset = %u", (unsigned)(op-(BYTE*)dst), (unsigned)offset);
             match = op - offset;
             assert(match <= op);  /* overflow check */
+
+#if defined(__GNUC__) || defined(__clang__)
+            /* Match offsets in zram-style workloads are effectively random
+             * within the 4KB page, so this load is a frequent cache-miss
+             * source. Kick the prefetch off now; by the time we reach the
+             * actual copy a few instructions below, the line has a chance
+             * to land. Read-only, temporal-locality hint (data reused soon
+             * after by subsequent overlapping matches). */
+            __builtin_prefetch(match, 0, 3);
+#endif
 
             /* get matchlength */
             length = token & ML_MASK;
