@@ -48,8 +48,19 @@
 /*
  * LZ4_ACCELERATION_DEFAULT :
  * Select "acceleration" for LZ4_compress_fast() when parameter value <= 0
+ * Overridable at build time (e.g. -DLZ4_ACCELERATION_DEFAULT=4) so a
+ * zram-style caller can trade a bit of compression ratio for faster
+ * page-out compression without touching this source file again.
+ * Default (1) is unchanged from upstream.
  */
-#define LZ4_ACCELERATION_DEFAULT 1
+#ifndef LZ4_ACCELERATION_DEFAULT
+   /* Baked-in default for this zram/gaming-tuned fork: 2 instead of
+    * upstream's 1. Trims a bit of match-search work on the compress
+    * (page-out) side for less CPU time per page, at a small compression
+    * ratio cost. Override with -DLZ4_ACCELERATION_DEFAULT=N if this ratio
+    * tradeoff doesn't fit your zram capacity. */
+#  define LZ4_ACCELERATION_DEFAULT 2
+#endif
 /*
  * LZ4_ACCELERATION_MAX :
  * Any "acceleration" value higher than this threshold
@@ -394,20 +405,15 @@ static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 #ifndef LZ4_FAST_DEC_LOOP
 #  if defined __i386__ || defined _M_IX86 || defined __x86_64__ || defined _M_X64
 #    define LZ4_FAST_DEC_LOOP 1
-#  elif defined(__aarch64__) && defined(__APPLE__)
-#    define LZ4_FAST_DEC_LOOP 1
-#  elif defined(__aarch64__) && !defined(__clang__)
-     /* On non-Apple aarch64, we disable this optimization for clang because
-      * on certain mobile chipsets, performance is reduced with clang. For
-      * more information refer to https://github.com/lz4/lz4/pull/707 */
-#    define LZ4_FAST_DEC_LOOP 1
-#  elif defined(__aarch64__) && defined(LZ4_FORCE_AARCH64_CLANG_FAST_LOOP)
-     /* Upstream disables the fast decode loop for clang on non-Apple aarch64
-      * because of a regression seen on *some* older mobile SoCs (PR #707).
-      * Modern high-end aarch64 cores (e.g. Cortex-X/Oryon on 8-series
-      * Snapdragons) were not part of that regression report. Define
-      * LZ4_FORCE_AARCH64_CLANG_FAST_LOOP at build time to re-enable this
-      * path and benchmark on your actual target before shipping it. */
+#  elif defined(__aarch64__)
+     /* Baked-in default for this zram/gaming-tuned fork: always use the
+      * fast decode loop on aarch64, including clang builds. Upstream
+      * disables this for non-Apple clang because of a regression seen on
+      * *some* older mobile SoCs (https://github.com/lz4/lz4/pull/707).
+      * That tradeoff doesn't fit this build's goal (fastest, lowest-power
+      * decompression on modern high-end aarch64 cores). Define
+      * LZ4_FAST_DEC_LOOP=0 explicitly at build time if you ever need the
+      * old conservative behavior back for a specific target. */
 #    define LZ4_FAST_DEC_LOOP 1
 #  else
 #    define LZ4_FAST_DEC_LOOP 0
