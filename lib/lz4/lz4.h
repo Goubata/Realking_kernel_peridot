@@ -178,7 +178,12 @@ LZ4LIB_API const char* LZ4_versionString (void);   /**< library version string; 
 
 /* These are absolute limits, they should not be changed by users */
 #define LZ4_MEMORY_USAGE_MIN 10
-#define LZ4_MEMORY_USAGE_DEFAULT 14
+/* Baked-in default for this zram/gaming-tuned fork: 12 (4KB hash table)
+ * instead of upstream's 14 (16KB table). zram compresses fixed 4KB pages,
+ * so a table sized for arbitrary large inputs wastes cache footprint and
+ * reset time on every call. Small ratio cost, better cache residency.
+ * Override with -DLZ4_MEMORY_USAGE=N at build time if needed. */
+#define LZ4_MEMORY_USAGE_DEFAULT 12
 #define LZ4_MEMORY_USAGE_MAX 20
 
 #if (LZ4_MEMORY_USAGE < LZ4_MEMORY_USAGE_MIN)
