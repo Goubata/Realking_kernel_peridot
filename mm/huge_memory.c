@@ -606,7 +606,7 @@ static unsigned long __thp_get_unmapped_area(struct file *filp,
 {
 	loff_t off_end = off + len;
 	loff_t off_align = round_up(off, size);
-	unsigned long len_pad, ret;
+	unsigned long len_pad, ret, off_sub;
 
 	if (!IS_ENABLED(CONFIG_64BIT) || in_compat_syscall())
 		return 0;
@@ -635,7 +635,12 @@ static unsigned long __thp_get_unmapped_area(struct file *filp,
 	if (ret == addr)
 		return addr;
 
-	ret += (off - ret) & (size - 1);
+	off_sub = (off - ret) & (size - 1);
+
+	if (test_bit(MMF_TOPDOWN, &current->mm->flags) && !off_sub)
+		return ret + size;
+
+	ret += off_sub;
 	return ret;
 }
 
