@@ -637,7 +637,8 @@ static unsigned long __thp_get_unmapped_area(struct file *filp,
 
 	off_sub = (off - ret) & (size - 1);
 
-	if (test_bit(MMF_TOPDOWN, &current->mm->flags) && !off_sub)
+	if (current->mm->get_unmapped_area == arch_get_unmapped_area_topdown &&
+	    !off_sub)
 		return ret + size;
 
 	ret += off_sub;
